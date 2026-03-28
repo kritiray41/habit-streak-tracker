@@ -17,19 +17,25 @@ class HabitAdapter extends TypeAdapter<Habit> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Habit(
-      name: fields[0] as String,
-      isCompleted: fields[1] as bool,
+      id: fields[0] as String,
+      name: fields[1] as String,
+      createdAt: fields[2] as DateTime,
+      completedDays: (fields[3] as List).cast<DateTime>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Habit obj) {
     writer
-      ..writeByte(2)
+      ..writeByte(4)
       ..writeByte(0)
-      ..write(obj.name)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.isCompleted);
+      ..write(obj.name)
+      ..writeByte(2)
+      ..write(obj.createdAt)
+      ..writeByte(3)
+      ..write(obj.completedDays);
   }
 
   @override
