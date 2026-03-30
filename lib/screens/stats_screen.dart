@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_heatmap_calendar/flutter_heatmap_calendar.dart';
+import 'package:fl_chart/fl_chart.dart'; 
 import '../models/habit.dart';
 
 class StatsScreen extends StatelessWidget {
@@ -18,6 +19,17 @@ class StatsScreen extends StatelessWidget {
     return dataset;
   }
 
+  // --- NEW: Analytics Calculation Methods ---
+  int _getTotalHabits(Box<Habit> box) => box.length;
+
+  int _getBestStreak(Box<Habit> box) {
+    int best = 0;
+    for (var habit in box.values) {
+      if (habit.streak > best) best = habit.streak;
+    }
+    return best;
+  }
+
   @override
   Widget build(BuildContext context) {
     final box = Hive.box<Habit>('habits');
@@ -27,11 +39,7 @@ class StatsScreen extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF8A2387),
-            Color(0xFFE94057),
-            Color(0xFFF27121),
-          ],
+          colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
         ),
       ),
       child: Scaffold(
@@ -40,18 +48,10 @@ class StatsScreen extends StatelessWidget {
           title: const Text(
             "Statistics",
             style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 1.5,
-              shadows: [
-                Shadow(color: Colors.black45, offset: Offset(2, 2), blurRadius: 0),
-                Shadow(color: Colors.black26, offset: Offset(4, 4), blurRadius: 0),
-              ],
+              fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white,
             ),
           ),
           centerTitle: true,
-          foregroundColor: Colors.white,
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
@@ -59,28 +59,40 @@ class StatsScreen extends StatelessWidget {
           valueListenable: box.listenable(),
           builder: (context, Box<Habit> box, _) {
             final heatmapData = _prepHeatmapData(box);
+            final totalHabits = _getTotalHabits(box);
+            final bestStreak = _getBestStreak(box);
 
-            // --- THE FIX: SingleChildScrollView added here ---
             return SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // --- NEW: Analytics Dashboard Cards ---
+                    Row(
+                      children: [
+                        Expanded(child: _buildStatCard("Total Habits", "$totalHabits", Icons.list_alt)),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildStatCard("Best Streak", "$bestStreak Days", Icons.local_fire_department)),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- NEW: Weekly Completion Graph (fl_chart) ---
+                    const Text(
+                      "Weekly Progress",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildWeeklyChart(),
+                    const SizedBox(height: 24),
+
+                    // EXISTING HEATMAP
                     const Text(
                       "Activity Heatmap",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(color: Colors.black38, offset: Offset(2, 2), blurRadius: 0),
-                        ],
-                      ),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
                     ),
-                    const SizedBox(height: 20),
-                    
-                    // GLASSMORPHISM HEATMAP
+                    const SizedBox(height: 16),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(24),
                       child: BackdropFilter(
@@ -97,33 +109,80 @@ class StatsScreen extends StatelessWidget {
                             colorMode: ColorMode.opacity,
                             defaultColor: Colors.white.withOpacity(0.2),
                             textColor: Colors.white,
-                            weekTextColor: Colors.white70,
-                            colorsets: const {
-                              1: Colors.amberAccent,
-                            },
-                            onClick: (value) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.deepPurple.shade800,
-                                  content: Text(
-                                    'Activity on ${value.toString().split(' ')[0]}',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              );
-                            },
+                            colorsets: const {1: Colors.amberAccent},
                           ),
                         ),
                       ),
                     ),
-                    
-                    // Extra padding at the bottom for smooth scrolling
                     const SizedBox(height: 40),
                   ],
                 ),
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  // Helper widget for Metric Cards
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white, size: 30),
+          const SizedBox(height: 8),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(title, style: const TextStyle(color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for fl_chart integration
+  Widget _buildWeeklyChart() {
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+      ),
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                  return Text(days[value.toInt()], style: const TextStyle(color: Colors.white));
+                },
+              ),
+            ),
+          ),
+          barGroups: [
+            // Note: You will need to calculate these Y values based on actual weekly data
+            BarChartGroupData(x: 0, barRods: [BarChartRodData(toY: 2, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 1, barRods: [BarChartRodData(toY: 5, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 2, barRods: [BarChartRodData(toY: 3, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 3, barRods: [BarChartRodData(toY: 4, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 4, barRods: [BarChartRodData(toY: 1, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 5, barRods: [BarChartRodData(toY: 0, color: Colors.amberAccent)]),
+            BarChartGroupData(x: 6, barRods: [BarChartRodData(toY: 2, color: Colors.amberAccent)]),
+          ],
         ),
       ),
     );

@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-// Removed the google_fonts import!
-
+import 'package:google_fonts/google_fonts.dart'; 
 import 'models/habit.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
+import 'services/notification_service.dart'; // <-- NOTIFICATION IMPORT
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
+  // --- INITIALIZE NOTIFICATIONS BEFORE APP STARTS ---
+  await NotificationService().init(); 
+  
   await Hive.initFlutter();
-  Hive.registerAdapter(HabitAdapter());
-
+  
+  if (!Hive.isAdapterRegistered(0)) {
+    Hive.registerAdapter(HabitAdapter());
+  }
+  
   await Hive.openBox<Habit>('habits');
-
+  await Hive.openBox('settings'); 
+  
   runApp(const MyApp());
 }
 
@@ -21,36 +28,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Habit Tracker',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.deepPurple, 
-        scaffoldBackgroundColor: Colors.grey.shade100, 
-        
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          centerTitle: true,
-          iconTheme: IconThemeData(color: Colors.deepPurple),
-          titleTextStyle: TextStyle(
-            color: Colors.deepPurple,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    // Listen to the settings box for theme changes
+    return ValueListenableBuilder(
+      valueListenable: Hive.box('settings').listenable(),
+      builder: (context, box, _) {
+        bool isDarkMode = box.get('isDarkMode', defaultValue: true);
 
-        // Changed from CardTheme to CardThemeData to match your Flutter version
-        cardTheme: CardThemeData(
-          elevation: 2,
-          shadowColor: const Color.fromARGB(255, 240, 25, 43).withOpacity(0.2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        return MaterialApp(
+          title: 'Habit Streak',
+          debugShowCheckedModeBanner: false,
+          themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          
+          // --- LIGHT THEME ---
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            colorSchemeSeed: const Color(0xFF38BDF8),
+            textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme),
           ),
-        ),
-      ),
-      home: const HomeScreen(),
+          
+          // --- DARK THEME ---
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorSchemeSeed: const Color(0xFF38BDF8),
+            textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme),
+          ),
+          
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:flutter/material.dart';
 
 part 'habit.g.dart';
 
@@ -16,11 +17,28 @@ class Habit extends HiveObject {
   @HiveField(3)
   List<DateTime> completedDays;
 
+  // --- NEW FIELDS FOR 11.8 (PERSISTING 11.4 PRO FEATURES) ---
+  @HiveField(4)
+  String frequency;
+
+  @HiveField(5)
+  int colorValue;
+
+  @HiveField(6)
+  int iconCodePoint;
+
+  @HiveField(7)
+  String? reminderTime;
+
   Habit({
     required this.id,
     required this.name,
     required this.createdAt,
     required this.completedDays,
+    this.frequency = 'Daily',
+    this.colorValue = 0xFF38BDF8, // Default Primary Color
+    this.iconCodePoint = 0xe5f9, // Default Star Icon (Icons.star)
+    this.reminderTime,
   });
 
   // --- STREAK CALCULATION ALGORITHM ---
@@ -28,12 +46,9 @@ class Habit extends HiveObject {
     int currentStreak = 0;
     DateTime today = DateTime.now();
 
-    // Loop backwards day by day
     for (int i = 0; ; i++) {
-      // Get the date we are currently checking (today, then yesterday, etc.)
       DateTime dateToCheck = today.subtract(Duration(days: i));
 
-      // Check if this date exists in our completed list (ignoring the exact time)
       bool isCompletedOnDate = completedDays.any((d) =>
           d.year == dateToCheck.year &&
           d.month == dateToCheck.month &&
@@ -42,12 +57,10 @@ class Habit extends HiveObject {
       if (isCompletedOnDate) {
         currentStreak++;
       } else {
-        // If it's today and we haven't completed it yet, don't break the streak!
-        // We only break the streak if a past day (yesterday or older) was missed.
         if (i == 0) {
           continue; 
         } else {
-          break; // A gap was found, break the loop
+          break; 
         }
       }
     }
